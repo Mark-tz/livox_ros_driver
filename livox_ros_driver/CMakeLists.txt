@@ -1,223 +1,157 @@
-# Copyright(c) 2019 livoxtech limited.
+cmake_minimum_required(VERSION 3.8)
+project(livox_ros_driver)
 
-cmake_minimum_required(VERSION 3.0)
+# Default to C++17
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
 
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
 
-#---------------------------------------------------------------------------------------
-# Start livox_ros_driver project
-#---------------------------------------------------------------------------------------
-include(cmake/version.cmake)
-project(livox_ros_driver VERSION ${LIVOX_ROS_DRIVER_VERSION} LANGUAGES CXX)
-message(STATUS "livox_ros_driver version: ${LIVOX_ROS_DRIVER_VERSION}")
-
-#---------------------------------------------------------------------------------------
-# find package and the dependecy
-#---------------------------------------------------------------------------------------
-find_package(Boost 1.54 REQUIRED COMPONENTS
-	system
-	thread
-	chrono
-	)
-
-## Find catkin macros and libraries
-## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS
-	roscpp
-	rospy
-	sensor_msgs
-	std_msgs
-	message_generation
-	rosbag
-	pcl_ros
-	)
-
-## Find pcl lib
+# Find dependencies
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(pcl_ros REQUIRED)
+find_package(pcl_conversions REQUIRED)
+find_package(rosbag2_cpp REQUIRED)
+find_package(rosbag2_storage REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(Boost REQUIRED COMPONENTS system thread chrono)
 find_package(PCL REQUIRED)
+find_package(PkgConfig REQUIRED)
 
-## Generate messages in the 'msg' folder
-add_message_files(FILES
-	CustomPoint.msg
-	CustomMsg.msg
-#   Message2.msg
-	)
-
-## Generate added messages and services with any dependencies listed here
-generate_messages(DEPENDENCIES
-	std_msgs
-	)
-
-find_package(PkgConfig)
+# Check for APR
 pkg_check_modules(APR apr-1)
-if (APR_FOUND)
-	message(${APR_INCLUDE_DIRS})
-	message(${APR_LIBRARIES})
-endif (APR_FOUND)
-
-###################################
-## catkin specific configuration ##
-###################################
-## The catkin_package macro generates cmake config files for your package
-## Declare things to be passed to dependent projects
-## INCLUDE_DIRS: uncomment this if your package contains header files
-## LIBRARIES: libraries you create in this project that dependent projects als    o need
-## CATKIN_DEPENDS: catkin_packages dependent projects also need
-## DEPENDS: system dependencies of this project that dependent projects also n    eed
-catkin_package(CATKIN_DEPENDS
-	roscpp rospy std_msgs message_runtime
-	pcl_ros
-	)
-
-#---------------------------------------------------------------------------------------
-# Set default build to release
-#---------------------------------------------------------------------------------------
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose Release or Debug" FORCE)
+if(APR_FOUND)
+  message(STATUS "APR found: ${APR_INCLUDE_DIRS}")
+  message(STATUS "APR libraries: ${APR_LIBRARIES}")
 endif()
 
-#---------------------------------------------------------------------------------------
-# Compiler config
-#---------------------------------------------------------------------------------------
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+# Generate interfaces
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/CustomPoint.msg"
+  "msg/CustomMsg.msg"
+  DEPENDENCIES std_msgs
+)
 
-## make sure the livox_sdk_static library is installed
-find_library(LIVOX_SDK_LIBRARY liblivox_sdk_static.a /usr/local/lib)
+# Add this line to ensure proper interface generation
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
-if((NOT LIVOX_SDK_LIBRARY) OR (NOT EXISTS ${LIVOX_SDK_LIBRARY}))
-	# couldn't find the livox sdk library
-	message("Coudn't find livox sdk library!")
-	message("Download Livox-SDK from github and build&install it please!")
-	message("Download Livox-SDK from github and build&install it please!")
-	message("Download Livox-SDK from github and build&install it please!")
+# Build livox_sdk as subdirectory with relaxed warnings
+set(LIVOX_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/livox_sdk")
 
-	message("git clone Livox-SDK from github temporarily, only for ROS distro jenkins build!")
+# Create a separate scope for livox_sdk compilation
+function(build_livox_sdk)
+  # Save current flags
+  set(ORIGINAL_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  
+  # Set relaxed compilation flags for livox_sdk
+  set(CMAKE_CXX_FLAGS "-std=c++17 -O2")
+  
+  # Add livox_sdk
+  add_subdirectory(livox_sdk livox_sdk_build)
+  
+  # Restore flags (this won't affect the parent scope)
+  set(CMAKE_CXX_FLAGS "${ORIGINAL_CXX_FLAGS}")
+endfunction()
 
-	# clone livox sdk source code from github
-	execute_process(COMMAND rm -rf ${CMAKE_CURRENT_SOURCE_DIR}/Livox-SDK OUTPUT_VARIABLE cmd_res)
-	message("Try to pull the livox sdk source code from github")
-	FOREACH(res ${cmd_res})
-		MESSAGE(${res})
-	ENDFOREACH()
+build_livox_sdk()
 
-	execute_process(COMMAND git clone https://github.com/Livox-SDK/Livox-SDK.git ${CMAKE_CURRENT_SOURCE_DIR}/Livox-SDK OUTPUT_VARIABLE cmd_res)
-	FOREACH(res ${cmd_res})
-		MESSAGE(${res})
-	ENDFOREACH()
+# Include directories
+include_directories(
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/common
+  ${CMAKE_CURRENT_SOURCE_DIR}/common/rapidjson
+  ${CMAKE_CURRENT_SOURCE_DIR}/common/rapidxml
+  ${CMAKE_CURRENT_SOURCE_DIR}/common/comm
+  ${CMAKE_CURRENT_SOURCE_DIR}/timesync
+  ${CMAKE_CURRENT_SOURCE_DIR}/timesync/user_uart
+  ${CMAKE_CURRENT_SOURCE_DIR}/livox_sdk/sdk_core/include
+  ${PCL_INCLUDE_DIRS}
+  ${APR_INCLUDE_DIRS}
+)
 
-	execute_process(COMMAND cmake .. WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Livox-SDK/build OUTPUT_VARIABLE cmd_res)
-	FOREACH(res ${cmd_res})
-		MESSAGE(${res})
-	ENDFOREACH()
+# Link directories
+link_directories(
+  ${PCL_LIBRARY_DIRS}
+  ${APR_LIBRARY_DIRS}
+)
 
-	execute_process(COMMAND make WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Livox-SDK/build OUTPUT_VARIABLE cmd_res)
-	FOREACH(res ${cmd_res})
-		MESSAGE(${res})
-	ENDFOREACH()
-
-	include_directories(
-		./
-		${CMAKE_CURRENT_SOURCE_DIR}/Livox-SDK/sdk_core/include
-	)
-
-	link_directories(
-		./
-		${CMAKE_CURRENT_SOURCE_DIR}/Livox-SDK/build/sdk_core
-	)
-
-else()
-	message("find livox sdk library success")
-endif()
-
-## PCL library
-link_directories(${PCL_LIBRARY_DIRS})
+# Add compile definitions
 add_definitions(${PCL_DEFINITIONS})
 
-#---------------------------------------------------------------------------------------
-# generate excutable and add libraries
-#---------------------------------------------------------------------------------------
+# Create executable
 add_executable(${PROJECT_NAME}_node
-    ""
-    )
+  src/lvx_file.cpp
+  src/ldq.cpp
+  src/lds.cpp
+  src/lds_lvx.cpp
+  src/lds_lidar.cpp
+  src/lds_hub.cpp
+  src/lddc.cpp
+  src/livox_ros_driver.cpp
+  timesync/timesync.cpp
+  timesync/user_uart/user_uart.cpp
+  common/comm/comm_protocol.cpp
+  common/comm/sdk_protocol.cpp
+  common/comm/gps_protocol.cpp
+)
 
-#---------------------------------------------------------------------------------------
-# precompile macro and compile option
-#---------------------------------------------------------------------------------------
-target_compile_options(${PROJECT_NAME}_node
-    PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wall>
-    )
+# Target dependencies
+ament_target_dependencies(${PROJECT_NAME}_node
+  rclcpp
+  std_msgs
+  sensor_msgs
+  geometry_msgs
+  pcl_ros
+  pcl_conversions
+  rosbag2_cpp
+  rosbag2_storage
+  tf2
+  tf2_ros
+)
 
-#---------------------------------------------------------------------------------------
-# add projects that depend on
-#---------------------------------------------------------------------------------------
-add_dependencies(${PROJECT_NAME}_node ${PROJECT_NAME}_generate_messages_cpp)
-
-#---------------------------------------------------------------------------------------
-# source file
-#---------------------------------------------------------------------------------------
-target_sources(${PROJECT_NAME}_node
-	PRIVATE
-	livox_ros_driver/lvx_file.cpp
-	livox_ros_driver/ldq.cpp
-	livox_ros_driver/lds.cpp
-	livox_ros_driver/lds_lvx.cpp
-	livox_ros_driver/lds_lidar.cpp
-	livox_ros_driver/lds_hub.cpp
-	livox_ros_driver/lddc.cpp
-	livox_ros_driver/livox_ros_driver.cpp
-	timesync/timesync.cpp
-	timesync/user_uart/user_uart.cpp
-	common/comm/comm_protocol.cpp
-	common/comm/sdk_protocol.cpp
-	common/comm/gps_protocol.cpp
-	)
-
-#---------------------------------------------------------------------------------------
-# include file
-#---------------------------------------------------------------------------------------
-target_include_directories(${PROJECT_NAME}_node
-    PUBLIC
-    ${catkin_INCLUDE_DIRS}
-    ${PCL_INCLUDE_DIRS}
-    ${APR_INCLUDE_DIRS}
-    common
-    common/rapidjson
-    comon/rapdidxml
-    common/comm
-    timesync
-    timesync/user_uart
-    livox_ros_driver
-    )
-
-#---------------------------------------------------------------------------------------
-# link libraries
-#---------------------------------------------------------------------------------------
+# Link libraries
 target_link_libraries(${PROJECT_NAME}_node
-	livox_sdk_static.a
-	${Boost_LIBRARY}
-	${catkin_LIBRARIES}
-	${PCL_LIBRARIES}
-	${APR_LIBRARIES}
-	)
+  livox_sdk_static
+  ${Boost_LIBRARIES}
+  ${PCL_LIBRARIES}
+  ${APR_LIBRARIES}
+)
 
+# Ensure message generation happens before building the executable
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(${PROJECT_NAME}_node "${cpp_typesupport_target}")
 
-#---------------------------------------------------------------------------------------
-# Install
-#---------------------------------------------------------------------------------------
-
+# Install targets
 install(TARGETS ${PROJECT_NAME}_node
-	ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-	LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-	RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-	)
+  DESTINATION lib/${PROJECT_NAME}
+)
 
+# Install directories
 install(DIRECTORY
   launch
   config
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-	)
+  DESTINATION share/${PROJECT_NAME}/
+)
 
-#---------------------------------------------------------------------------------------
-# end of CMakeList.txt
-#---------------------------------------------------------------------------------------
+# Install package.xml
+install(FILES package.xml
+  DESTINATION share/${PROJECT_NAME}
+)
+
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+endif()
+
+# Export dependencies and targets for message interfaces
+ament_export_dependencies(rosidl_default_runtime)
+ament_package()
