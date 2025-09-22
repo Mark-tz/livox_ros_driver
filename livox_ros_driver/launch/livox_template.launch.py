@@ -96,7 +96,7 @@ def generate_launch_description():
             'data_src': LaunchConfiguration('data_src'),
             'publish_freq': LaunchConfiguration('publish_freq'),
             'output_data_type': LaunchConfiguration('output_type'),
-            'cmdline_str': LaunchConfiguration('bd_list'),
+            'cmdline_str': str(LaunchConfiguration('bd_list')),
             'cmdline_file_path': LaunchConfiguration('lvx_file_path'),
             'user_config_path': PathJoinSubstitution([pkg_share, 'config', 'livox_lidar_config.json']),
             'frame_id': LaunchConfiguration('msg_frame_id'),

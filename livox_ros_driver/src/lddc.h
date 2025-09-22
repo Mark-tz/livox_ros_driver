@@ -53,7 +53,7 @@ typedef enum {
 class Lddc {
  public:
   Lddc(int format, int multi_topic, int data_src, int output_type, double frq,
-      std::string &frame_id, bool lidar_bag, bool imu_bag, std::shared_ptr<rclcpp::Node> node);
+      std::string &frame_id, bool lidar_bag, bool imu_bag, bool use_pc_time, std::shared_ptr<rclcpp::Node> node);
   ~Lddc();
 
   int RegisterLds(Lds *lds);
@@ -96,6 +96,8 @@ class Lddc {
   std::string frame_id_;
   bool enable_lidar_bag_;
   bool enable_imu_bag_;
+  bool use_pc_time_;
+
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr private_pub_[kMaxSourceLidar];
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr global_pub_;
   rclcpp::Publisher<livox_ros_driver::msg::CustomMsg>::SharedPtr private_custom_pub_[kMaxSourceLidar];

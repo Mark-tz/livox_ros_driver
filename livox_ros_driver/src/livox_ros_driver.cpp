@@ -80,6 +80,7 @@ int main(int argc, char **argv) {
   std::string frame_id = "livox_frame";
   bool lidar_bag = true;
   bool imu_bag   = false;
+  bool use_pc_time = false;
 
   // Declare and get parameters
   livox_node->declare_parameter("xfer_format", xfer_format);
@@ -90,6 +91,7 @@ int main(int argc, char **argv) {
   livox_node->declare_parameter("frame_id", frame_id);
   livox_node->declare_parameter("enable_lidar_bag", lidar_bag);
   livox_node->declare_parameter("enable_imu_bag", imu_bag);
+  livox_node->declare_parameter("use_pc_time", use_pc_time);
   
   livox_node->get_parameter("xfer_format", xfer_format);
   livox_node->get_parameter("multi_topic", multi_topic);
@@ -99,6 +101,7 @@ int main(int argc, char **argv) {
   livox_node->get_parameter("frame_id", frame_id);
   livox_node->get_parameter("enable_lidar_bag", lidar_bag);
   livox_node->get_parameter("enable_imu_bag", imu_bag);
+  livox_node->get_parameter("use_pc_time", use_pc_time);
   
   if (publish_freq > 100.0) {
     publish_freq = 100.0;
@@ -110,7 +113,7 @@ int main(int argc, char **argv) {
 
   /** Lidar data distribute control and lidar data source set */
   Lddc *lddc = new Lddc(xfer_format, multi_topic, data_src, output_type,
-                        publish_freq, frame_id, lidar_bag, imu_bag, livox_node);
+                        publish_freq, frame_id, lidar_bag, imu_bag, use_pc_time, livox_node);
 
   int ret = 0;
   if (data_src == kSourceRawLidar) {

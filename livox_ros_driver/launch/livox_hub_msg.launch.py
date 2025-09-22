@@ -1,11 +1,9 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, GroupAction
+from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
-from ament_index_python.packages import get_package_share_directory
-import os
 
 def generate_launch_description():
     # Declare launch arguments
@@ -96,7 +94,7 @@ def generate_launch_description():
             'data_src': LaunchConfiguration('data_src'),
             'publish_freq': LaunchConfiguration('publish_freq'),
             'output_data_type': LaunchConfiguration('output_type'),
-            'cmdline_str': LaunchConfiguration('bd_list'),
+            'cmdline_str': str(LaunchConfiguration('bd_list')),
             'cmdline_file_path': LaunchConfiguration('lvx_file_path'),
             'user_config_path': PathJoinSubstitution([pkg_share, 'config', 'livox_hub_config.json']),
             'frame_id': LaunchConfiguration('msg_frame_id'),
